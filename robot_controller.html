@@ -359,7 +359,8 @@
     }
 
     const startTime = Date.now();
-    const url = `https://api.thingspeak.com/update?api_key=${WRITE_API_KEY}&field1=${command}`;
+    // Send to Field 8 (or Field 1 if using separate channel)
+    const url = `https://api.thingspeak.com/update?api_key=${WRITE_API_KEY}&field8=${command}`;
 
     try {
       const res = await fetch(url);

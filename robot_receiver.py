@@ -22,6 +22,7 @@ import urllib.request
 import urllib.parse
 import time
 import json
+import ssl
 
 # ─── CONFIGURATION ─────────────────────────────────────────────────────────
 READ_API_KEY  = "8OR6MJ5AN4UGAUWP"      # Your ThingSpeak Read API Key
@@ -43,9 +44,13 @@ def get_last_command():
     """Fetch the last command from ThingSpeak"""
     url = f"{THINGSPEAK_URL}/channels/{CHANNEL_ID}/feeds/last.json?api_key={READ_API_KEY}"
     try:
-        with urllib.request.urlopen(url, timeout=5) as response:
+        # Skip SSL verification (workaround for macOS certificate issues)
+        ssl_context = ssl._create_unverified_context()
+        request = urllib.request.Request(url)
+        with urllib.request.urlopen(request, context=ssl_context, timeout=5) as response:
             data = json.loads(response.read().decode())
-            command = data.get('field1', '')
+            # Read from Field 8 for robot commands (Field 1-7 is for sensors)
+            command = data.get('field8', '')
             return command.strip() if command else None
     except Exception as e:
         print(f"  ❌ Error fetching command: {e}")

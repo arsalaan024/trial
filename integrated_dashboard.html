@@ -591,7 +591,8 @@ async function sendCommand(command) {
   }
 
   const startTime = Date.now();
-  const url = `https://api.thingspeak.com/update?api_key=${ROBOT_WRITE_API_KEY}&field1=${command}`;
+  // Send to Field 8 (Field 1-7 reserved for sensor data)
+  const url = `https://api.thingspeak.com/update?api_key=${ROBOT_WRITE_API_KEY}&field8=${command}`;
 
   try {
     const res = await fetch(url);
