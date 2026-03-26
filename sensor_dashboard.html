@@ -457,9 +457,11 @@ function applyConfig() {
 /* ── FETCH FROM THINGSPEAK ───────────────────────────────────── */
 async function fetchData() {
   if (!CHANNEL_ID || !READ_API_KEY) return;
-  const url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds/last.json?api_key=${READ_API_KEY}`;
+  const thingspeakUrl = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds/last.json?api_key=${READ_API_KEY}`;
+  const corsProxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(thingspeakUrl)}`;
+  
   try {
-    const res  = await fetch(url);
+    const res  = await fetch(corsProxy);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     updateCards(data);
