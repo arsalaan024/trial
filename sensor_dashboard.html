@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IoT Sensor Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet" />
+<style>
+  /* ── RESET & VARS ───────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #080d14;
+    --surface:  #0d1520;
+    --border:   #1a2a3a;
+    --accent1:  #00e5ff;   /* cyan  – temp/humidity */
+    --accent2:  #39ff14;   /* neon green – soil/rain */
+    --accent3:  #ff6b35;   /* orange – smoke */
+    --accent4:  #a855f7;   /* purple – motion */
+    --accent5:  #ffd60a;   /* yellow – distance */
+    --text:     #cdd6e0;
+    --muted:    #4a6070;
+    --ok:       #39ff14;
+    --warn:     #ffd60a;
+    --danger:   #ff3b3b;
+    --font-mono: 'Space Mono', monospace;
+    --font-ui:   'Syne', sans-serif;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    overflow-x: hidden;
+  }
+
+  /* ── GRID NOISE BG ─────────────────────────────────────────── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── LAYOUT ─────────────────────────────────────────────────── */
+  .wrapper {
+    position: relative; z-index: 1;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  /* ── HEADER ─────────────────────────────────────────────────── */
+  header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 2.5rem;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .logo-area h1 {
+    font-size: clamp(1.4rem, 3vw, 2rem);
+    font-weight: 800;
+    letter-spacing: -.02em;
+    color: #fff;
+    line-height: 1;
+  }
+  .logo-area h1 span { color: var(--accent1); }
+
+  .logo-area p {
+    font-size: .78rem;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    margin-top: .4rem;
+    letter-spacing: .06em;
+  }
+
+  .status-bar {
+    display: flex; align-items: center; gap: .8rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: .5rem 1rem;
+    font-family: var(--font-mono);
+    font-size: .75rem;
+  }
+  .pulse-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--ok);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  .pulse-dot.offline { background: var(--danger); animation: none; }
+  @keyframes pulse {
+    0%,100% { opacity:1; box-shadow: 0 0 0 0 rgba(57,255,20,.5); }
+    50%      { opacity:.6; box-shadow: 0 0 0 6px rgba(57,255,20,0); }
+  }
+
+  #last-updated { color: var(--muted); }
+  #status-text  { color: var(--ok); }
+
+  /* ── CONFIG PANEL ───────────────────────────────────────────── */
+  .config-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;
+    margin-bottom: 2rem;
+  }
+  .config-panel label {
+    display: flex; flex-direction: column; gap: .3rem;
+    font-size: .72rem; color: var(--muted); font-family: var(--font-mono);
+    letter-spacing: .08em;
+    flex: 1; min-width: 180px;
+  }
+  .config-panel input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: .45rem .7rem;
+    color: var(--accent1);
+    font-family: var(--font-mono);
+    font-size: .8rem;
+    outline: none;
+    transition: border-color .2s;
+    width: 100%;
+  }
+  .config-panel input:focus { border-color: var(--accent1); }
+
+  .btn {
+    background: var(--accent1);
+    color: var(--bg);
+    border: none; border-radius: 6px;
+    padding: .55rem 1.2rem;
+    font-family: var(--font-ui);
+    font-weight: 700; font-size: .8rem;
+    cursor: pointer; letter-spacing: .05em;
+    transition: opacity .15s, transform .1s;
+    white-space: nowrap;
+    align-self: flex-end;
+  }
+  .btn:hover  { opacity: .85; }
+  .btn:active { transform: scale(.97); }
+  .btn.sm { font-size: .72rem; padding: .4rem .9rem; }
+
+  /* ── CARDS GRID ─────────────────────────────────────────────── */
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1.2rem;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.4rem 1.3rem 1.2rem;
+    position: relative;
+    overflow: hidden;
+    transition: transform .2s, border-color .2s;
+  }
+  .card:hover { transform: translateY(-3px); }
+
+  /* colour accent line top */
+  .card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: var(--card-color, var(--accent1));
+    border-radius: 14px 14px 0 0;
+  }
+
+  /* glow blob */
+  .card::after {
+    content: '';
+    position: absolute; top: -40px; right: -40px;
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--card-color, var(--accent1)) 0%, transparent 70%);
+    opacity: .06;
+    pointer-events: none;
+  }
+
+  .card-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 1rem;
+  }
+  .card-icon {
+    font-size: 1.5rem;
+    line-height: 1;
+  }
+  .card-field {
+    font-family: var(--font-mono);
+    font-size: .65rem;
+    color: var(--muted);
+    letter-spacing: .1em;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: .15rem .45rem;
+  }
+
+  .card-label {
+    font-size: .72rem;
+    color: var(--muted);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    margin-bottom: .3rem;
+  }
+
+  .card-value {
+    font-family: var(--font-mono);
+    font-size: 2.4rem;
+    font-weight: 700;
+    color: var(--card-color, var(--accent1));
+    line-height: 1;
+    transition: color .3s;
+  }
+  .card-value .unit {
+    font-size: 1rem;
+    font-weight: 400;
+    color: var(--muted);
+    margin-left: .2rem;
+  }
+
+  /* badge for boolean fields */
+  .badge {
+    display: inline-flex; align-items: center; gap: .4rem;
+    font-size: .85rem; font-weight: 700;
+    font-family: var(--font-mono);
+    padding: .3rem .9rem;
+    border-radius: 999px;
+    border: 1.5px solid currentColor;
+  }
+  .badge.on  { color: var(--danger); }
+  .badge.off { color: var(--muted); }
+  .badge .dot { width:7px; height:7px; border-radius:50%; background:currentColor; }
+
+  /* mini sparkline area */
+  .sparkline-wrap {
+    margin-top: 1rem;
+    height: 40px;
+  }
+  .sparkline-wrap svg { width: 100%; height: 100%; }
+  .sparkline-line {
+    fill: none;
+    stroke: var(--card-color, var(--accent1));
+    stroke-width: 1.5;
+    opacity: .6;
+  }
+  .sparkline-fill {
+    opacity: .08;
+    fill: var(--card-color, var(--accent1));
+  }
+
+  /* alert bar */
+  .alert-strip {
+    margin-top: 1rem;
+    font-size: .7rem;
+    font-family: var(--font-mono);
+    color: var(--muted);
+    display: flex; align-items: center; gap: .4rem;
+  }
+  .alert-strip.warn  { color: var(--warn); }
+  .alert-strip.danger{ color: var(--danger); }
+
+  /* ── WIDE CHART ROW ──────────────────────────────────────────── */
+  .wide-card {
+    grid-column: 1 / -1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.4rem 1.3rem;
+  }
+  .wide-card h3 {
+    font-size: .75rem; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 1rem;
+    font-family: var(--font-mono);
+  }
+  #timeline-canvas { width: 100%; height: 160px; display: block; }
+
+  /* ── FOOTER ─────────────────────────────────────────────────── */
+  footer {
+    margin-top: 3rem;
+    text-align: center;
+    font-size: .7rem;
+    font-family: var(--font-mono);
+    color: var(--muted);
+    letter-spacing: .08em;
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- ── HEADER ─────────────────────────────────────────── -->
+  <header>
+    <div class="logo-area">
+      <h1>SENSOR<span>HUB</span></h1>
+      <p>THINGSPEAK · LIVE DASHBOARD · RASPBERRY PI 5</p>
+    </div>
+    <div class="status-bar">
+      <div class="pulse-dot" id="pulse"></div>
+      <span id="status-text">CONNECTING…</span>
+      <span style="color:var(--border)">|</span>
+      <span id="last-updated">--:--:--</span>
+    </div>
+  </header>
+
+  <!-- ── CONFIG ──────────────────────────────────────────── -->
+  <div class="config-panel">
+    <label>CHANNEL ID
+      <input id="cfg-channel" type="text" placeholder="e.g. 2961234" />
+    </label>
+    <label>READ API KEY
+      <input id="cfg-apikey" type="text" placeholder="XXXXXXXXXXXXXXXX" />
+    </label>
+    <label>REFRESH (sec)
+      <input id="cfg-interval" type="number" min="15" max="300" value="20" />
+    </label>
+    <button class="btn" onclick="applyConfig()">▶ CONNECT</button>
+  </div>
+
+  <!-- ── SENSOR CARDS ─────────────────────────────────────── -->
+  <div class="cards" id="cards-grid">
+
+    <!-- Temperature -->
+    <div class="card" style="--card-color: #00e5ff" id="card-temp">
+      <div class="card-header">
+        <span class="card-icon">🌡️</span>
+        <span class="card-field">FIELD 1</span>
+      </div>
+      <div class="card-label">TEMPERATURE</div>
+      <div class="card-value" id="val-temp">--<span class="unit">°C</span></div>
+      <div class="sparkline-wrap"><svg id="spark-temp"><polyline class="sparkline-line" id="sl-temp"/><polygon class="sparkline-fill" id="sf-temp"/></svg></div>
+      <div class="alert-strip" id="alert-temp">● AWAITING DATA</div>
+    </div>
+
+    <!-- Humidity -->
+    <div class="card" style="--card-color: #38bdf8" id="card-hum">
+      <div class="card-header">
+        <span class="card-icon">💧</span>
+        <span class="card-field">FIELD 2</span>
+      </div>
+      <div class="card-label">HUMIDITY</div>
+      <div class="card-value" id="val-hum">--<span class="unit">%</span></div>
+      <div class="sparkline-wrap"><svg id="spark-hum"><polyline class="sparkline-line" id="sl-hum" style="stroke:#38bdf8"/><polygon class="sparkline-fill" id="sf-hum" style="fill:#38bdf8"/></svg></div>
+      <div class="alert-strip" id="alert-hum">● AWAITING DATA</div>
+    </div>
+
+    <!-- Rain -->
+    <div class="card" style="--card-color: #39ff14" id="card-rain">
+      <div class="card-header">
+        <span class="card-icon">🌧️</span>
+        <span class="card-field">FIELD 3</span>
+      </div>
+      <div class="card-label">RAIN SENSOR</div>
+      <div id="val-rain"><span class="badge off" id="badge-rain"><span class="dot"></span>DRY</span></div>
+      <div class="alert-strip" id="alert-rain" style="margin-top:1.4rem">● AWAITING DATA</div>
+    </div>
+
+    <!-- Motion -->
+    <div class="card" style="--card-color: #a855f7" id="card-motion">
+      <div class="card-header">
+        <span class="card-icon">👤</span>
+        <span class="card-field">FIELD 4</span>
+      </div>
+      <div class="card-label">PIR MOTION</div>
+      <div id="val-motion"><span class="badge off" id="badge-motion"><span class="dot"></span>CLEAR</span></div>
+      <div class="alert-strip" id="alert-motion" style="margin-top:1.4rem">● AWAITING DATA</div>
+    </div>
+
+    <!-- Smoke -->
+    <div class="card" style="--card-color: #ff6b35" id="card-smoke">
+      <div class="card-header">
+        <span class="card-icon">💨</span>
+        <span class="card-field">FIELD 5</span>
+      </div>
+      <div class="card-label">SMOKE / GAS (MQ-2)</div>
+      <div class="card-value" id="val-smoke" style="color:#ff6b35">--<span class="unit">ppm</span></div>
+      <div class="sparkline-wrap"><svg id="spark-smoke"><polyline class="sparkline-line" id="sl-smoke" style="stroke:#ff6b35"/><polygon class="sparkline-fill" id="sf-smoke" style="fill:#ff6b35"/></svg></div>
+      <div class="alert-strip" id="alert-smoke">● AWAITING DATA</div>
+    </div>
+
+    <!-- Distance -->
+    <div class="card" style="--card-color: #ffd60a" id="card-dist">
+      <div class="card-header">
+        <span class="card-icon">📡</span>
+        <span class="card-field">FIELD 6</span>
+      </div>
+      <div class="card-label">ULTRASONIC DISTANCE</div>
+      <div class="card-value" id="val-dist" style="color:#ffd60a">--<span class="unit">cm</span></div>
+      <div class="sparkline-wrap"><svg id="spark-dist"><polyline class="sparkline-line" id="sl-dist" style="stroke:#ffd60a"/><polygon class="sparkline-fill" id="sf-dist" style="fill:#ffd60a"/></svg></div>
+      <div class="alert-strip" id="alert-dist">● AWAITING DATA</div>
+    </div>
+
+    <!-- Soil Moisture -->
+    <div class="card" style="--card-color: #4ade80" id="card-soil">
+      <div class="card-header">
+        <span class="card-icon">🌱</span>
+        <span class="card-field">FIELD 7</span>
+      </div>
+      <div class="card-label">SOIL MOISTURE</div>
+      <div class="card-value" id="val-soil" style="color:#4ade80">--<span class="unit">%</span></div>
+      <div class="sparkline-wrap"><svg id="spark-soil"><polyline class="sparkline-line" id="sl-soil" style="stroke:#4ade80"/><polygon class="sparkline-fill" id="sf-soil" style="fill:#4ade80"/></svg></div>
+      <div class="alert-strip" id="alert-soil">● AWAITING DATA</div>
+    </div>
+
+    <!-- Timeline chart spanning full width -->
+    <div class="wide-card">
+      <h3>⟳ TEMP + HUMIDITY · LAST 20 READINGS</h3>
+      <canvas id="timeline-canvas"></canvas>
+    </div>
+
+  </div><!-- /cards -->
+
+  <footer>
+    SENSΟRHUB v1.0 · THINGSPEAK API · AUTO-REFRESH EVERY <span id="ft-interval">20</span>s
+  </footer>
+
+</div><!-- /wrapper -->
+
+<script>
+/* ── STATE ───────────────────────────────────────────────────── */
+let CHANNEL_ID  = '';
+let READ_API_KEY = '';
+let INTERVAL_MS  = 20000;
+let timer = null;
+
+const history = { temp:[], hum:[], smoke:[], dist:[], soil:[] };
+const MAX_HIST = 20;
+
+/* ── CONFIG APPLY ────────────────────────────────────────────── */
+function applyConfig() {
+  CHANNEL_ID   = document.getElementById('cfg-channel').value.trim();
+  READ_API_KEY = document.getElementById('cfg-apikey').value.trim();
+  INTERVAL_MS  = parseInt(document.getElementById('cfg-interval').value) * 1000 || 20000;
+  document.getElementById('ft-interval').textContent = INTERVAL_MS / 1000;
+
+  if (!CHANNEL_ID || !READ_API_KEY) {
+    alert('Please enter both Channel ID and Read API Key.');
+    return;
+  }
+  setStatus('CONNECTING…', false);
+  if (timer) clearInterval(timer);
+  fetchData();
+  timer = setInterval(fetchData, INTERVAL_MS);
+}
+
+/* ── FETCH FROM THINGSPEAK ───────────────────────────────────── */
+async function fetchData() {
+  if (!CHANNEL_ID || !READ_API_KEY) return;
+  const url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds/last.json?api_key=${READ_API_KEY}`;
+  try {
+    const res  = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    updateCards(data);
+    setStatus('LIVE', true);
+  } catch(e) {
+    setStatus('ERROR: ' + e.message, false);
+  }
+}
+
+/* ── STATUS BAR ──────────────────────────────────────────────── */
+function setStatus(msg, ok) {
+  document.getElementById('status-text').textContent = msg;
+  document.getElementById('status-text').style.color = ok ? 'var(--ok)' : 'var(--danger)';
+  const dot = document.getElementById('pulse');
+  dot.classList.toggle('offline', !ok);
+  if (ok) {
+    const now = new Date();
+    document.getElementById('last-updated').textContent =
+      now.toLocaleTimeString('en-IN', {hour12:false});
+  }
+}
+
+/* ── UPDATE CARDS ────────────────────────────────────────────── */
+function updateCards(feed) {
+  const temp  = parseFloat(feed.field1);
+  const hum   = parseFloat(feed.field2);
+  const rain  = parseInt(feed.field3);
+  const motion= parseInt(feed.field4);
+  const smoke = parseFloat(feed.field5);
+  const dist  = parseFloat(feed.field6);
+  const soil  = parseFloat(feed.field7);
+
+  /* — Temperature — */
+  if (!isNaN(temp)) {
+    setValue('val-temp', temp.toFixed(1), '°C');
+    push(history.temp, temp);
+    const a = document.getElementById('alert-temp');
+    if (temp > 35)       { a.textContent='⚠ HIGH TEMP'; a.className='alert-strip danger'; }
+    else if (temp > 30)  { a.textContent='⚡ WARM';      a.className='alert-strip warn';   }
+    else                 { a.textContent='✓ NORMAL';     a.className='alert-strip';         }
+    drawSparkline('sl-temp','sf-temp','spark-temp', history.temp);
+  }
+
+  /* — Humidity — */
+  if (!isNaN(hum)) {
+    setValue('val-hum', hum.toFixed(1), '%');
+    push(history.hum, hum);
+    const a = document.getElementById('alert-hum');
+    if (hum > 85)       { a.textContent='⚠ VERY HUMID'; a.className='alert-strip warn';   }
+    else                { a.textContent='✓ NORMAL';      a.className='alert-strip';         }
+    drawSparkline('sl-hum','sf-hum','spark-hum', history.hum);
+  }
+
+  /* — Rain — */
+  const bRain = document.getElementById('badge-rain');
+  const aRain = document.getElementById('alert-rain');
+  if (!isNaN(rain)) {
+    if (rain === 1) {
+      bRain.innerHTML = '<span class="dot"></span>RAINING';
+      bRain.className = 'badge on';
+      aRain.textContent = '⚠ RAIN DETECTED'; aRain.className = 'alert-strip warn';
+    } else {
+      bRain.innerHTML = '<span class="dot"></span>DRY';
+      bRain.className = 'badge off';
+      aRain.textContent = '✓ NO RAIN'; aRain.className = 'alert-strip';
+    }
+  }
+
+  /* — Motion — */
+  const bMot = document.getElementById('badge-motion');
+  const aMot = document.getElementById('alert-motion');
+  if (!isNaN(motion)) {
+    if (motion === 1) {
+      bMot.innerHTML = '<span class="dot"></span>DETECTED';
+      bMot.className = 'badge on';
+      aMot.textContent = '⚠ MOTION!'; aMot.className = 'alert-strip danger';
+    } else {
+      bMot.innerHTML = '<span class="dot"></span>CLEAR';
+      bMot.className = 'badge off';
+      aMot.textContent = '✓ NO MOTION'; aMot.className = 'alert-strip';
+    }
+  }
+
+  /* — Smoke — */
+  if (!isNaN(smoke)) {
+    setValue('val-smoke', smoke.toFixed(0), 'ppm');
+    push(history.smoke, smoke);
+    const a = document.getElementById('alert-smoke');
+    if (smoke > 500)      { a.textContent='🔥 DANGER!';    a.className='alert-strip danger'; }
+    else if (smoke > 200) { a.textContent='⚠ ELEVATED';   a.className='alert-strip warn';   }
+    else                  { a.textContent='✓ NORMAL';      a.className='alert-strip';         }
+    drawSparkline('sl-smoke','sf-smoke','spark-smoke', history.smoke);
+  }
+
+  /* — Distance — */
+  if (!isNaN(dist)) {
+    setValue('val-dist', dist.toFixed(0), 'cm');
+    push(history.dist, dist);
+    const a = document.getElementById('alert-dist');
+    if (dist < 20)       { a.textContent='⚠ OBJECT CLOSE'; a.className='alert-strip warn'; }
+    else                 { a.textContent='✓ CLEAR';          a.className='alert-strip';      }
+    drawSparkline('sl-dist','sf-dist','spark-dist', history.dist);
+  }
+
+  /* — Soil moisture — */
+  if (!isNaN(soil)) {
+    setValue('val-soil', soil.toFixed(1), '%');
+    push(history.soil, soil);
+    const a = document.getElementById('alert-soil');
+    if (soil < 25)       { a.textContent='🌵 DRY — WATER!'; a.className='alert-strip danger'; }
+    else if (soil > 80)  { a.textContent='⚠ WET';           a.className='alert-strip warn';   }
+    else                 { a.textContent='✓ GOOD MOISTURE';  a.className='alert-strip';         }
+    drawSparkline('sl-soil','sf-soil','spark-soil', history.soil);
+  }
+
+  drawTimeline();
+}
+
+/* ── HELPERS ────────────────────────────────────────────────── */
+function setValue(id, val, unit) {
+  document.getElementById(id).innerHTML = val + `<span class="unit">${unit}</span>`;
+}
+
+function push(arr, val) {
+  arr.push(val);
+  if (arr.length > MAX_HIST) arr.shift();
+}
+
+/* ── SPARKLINES ─────────────────────────────────────────────── */
+function drawSparkline(lineId, fillId, svgId, data) {
+  if (data.length < 2) return;
+  const svg  = document.getElementById(svgId);
+  const W = svg.clientWidth  || 220;
+  const H = svg.clientHeight || 40;
+  const mn = Math.min(...data), mx = Math.max(...data);
+  const range = mx - mn || 1;
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * W;
+    const y = H - ((v - mn) / range) * (H - 4) - 2;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+
+  document.getElementById(lineId).setAttribute('points', pts);
+
+  const first = pts.split(' ')[0];
+  const last  = pts.split(' ').slice(-1)[0];
+  const fillPts = `0,${H} ${pts} ${W},${H}`;
+  document.getElementById(fillId).setAttribute('points', fillPts);
+}
+
+/* ── TIMELINE CANVAS ─────────────────────────────────────────── */
+function drawTimeline() {
+  const canvas = document.getElementById('timeline-canvas');
+  const ctx    = canvas.getContext('2d');
+  const dpr    = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth;
+  const H = 160;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0,0,W,H);
+
+  const drawLine = (arr, color) => {
+    if (arr.length < 2) return;
+    const mn = Math.min(...arr), mx = Math.max(...arr);
+    const range = mx - mn || 1;
+    ctx.beginPath();
+    arr.forEach((v, i) => {
+      const x = (i / (arr.length - 1)) * (W - 20) + 10;
+      const y = H - 20 - ((v - mn) / range) * (H - 40);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = 2;
+    ctx.lineJoin    = 'round';
+    ctx.stroke();
+
+    // last value label
+    const last = arr[arr.length - 1];
+    const lx = W - 10;
+    const ly = H - 20 - ((last - mn) / range) * (H - 40);
+    ctx.fillStyle = color;
+    ctx.font = '700 11px Space Mono, monospace';
+    ctx.fillText(last.toFixed(1), lx - 38, ly - 6);
+  };
+
+  // grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,.04)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = 10 + (i / 4) * (H - 30);
+    ctx.beginPath(); ctx.moveTo(10, y); ctx.lineTo(W-10, y); ctx.stroke();
+  }
+
+  drawLine(history.temp, '#00e5ff');
+  drawLine(history.hum,  '#38bdf8');
+
+  // legend
+  ctx.font = '10px Space Mono, monospace';
+  ctx.fillStyle = '#00e5ff'; ctx.fillText('● TEMP (°C)',  14, H - 2);
+  ctx.fillStyle = '#38bdf8'; ctx.fillText('● HUMIDITY (%)', 110, H - 2);
+}
+
+/* ── RESIZE ─────────────────────────────────────────────────── */
+window.addEventListener('resize', () => {
+  drawTimeline();
+  ['temp','hum','smoke','dist','soil'].forEach(k => {
+    const map = {temp:['sl-temp','sf-temp','spark-temp'],
+                 hum: ['sl-hum', 'sf-hum', 'spark-hum'],
+                 smoke:['sl-smoke','sf-smoke','spark-smoke'],
+                 dist: ['sl-dist','sf-dist','spark-dist'],
+                 soil: ['sl-soil','sf-soil','spark-soil']};
+    drawSparkline(...map[k], history[k]);
+  });
+});
+</script>
+</body>
+</html>
