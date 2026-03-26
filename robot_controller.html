@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Robo Car Controller</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #eee;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 900px;
+      width: 100%;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(45deg, #00d4ff, #00ff88);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .status {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 1rem;
+      background: rgba(0, 212, 255, 0.1);
+      padding: 1rem;
+      border-radius: 12px;
+      border: 2px solid rgba(0, 212, 255, 0.3);
+      margin-bottom: 2rem;
+    }
+
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ff3333;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    .status-dot.connected {
+      background: #00ff88;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .config-section {
+      background: rgba(255, 255, 255, 0.05);
+      border: 2px solid rgba(0, 212, 255, 0.2);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .config-section h2 {
+      color: #00d4ff;
+      margin-bottom: 1rem;
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .config-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .input-group label {
+      font-size: 0.8rem;
+      color: #00d4ff;
+      margin-bottom: 0.3rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .input-group input {
+      padding: 0.8rem;
+      background: rgba(0, 0, 0, 0.3);
+      border: 2px solid rgba(0, 212, 255, 0.3);
+      border-radius: 6px;
+      color: #fff;
+      font-size: 0.9rem;
+      transition: border-color 0.3s;
+    }
+
+    .input-group input:focus {
+      outline: none;
+      border-color: #00d4ff;
+      background: rgba(0, 212, 255, 0.1);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    button {
+      padding: 0.8rem 1.5rem;
+      background: linear-gradient(45deg, #00d4ff, #00ff88);
+      color: #1a1a2e;
+      border: none;
+      border-radius: 6px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0, 212, 255, 0.4);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    /* Control Pad */
+    .control-pad {
+      background: rgba(255, 255, 255, 0.05);
+      border: 2px solid rgba(0, 212, 255, 0.2);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .control-pad h2 {
+      color: #00d4ff;
+      margin-bottom: 1rem;
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .direction-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      max-width: 300px;
+      margin: 0 auto;
+    }
+
+    .direction-btn {
+      aspect-ratio: 1;
+      font-size: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 212, 255, 0.1);
+      border: 2px solid rgba(0, 212, 255, 0.3);
+      color: #00d4ff;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .direction-btn:hover {
+      background: rgba(0, 212, 255, 0.3);
+      transform: scale(1.05);
+    }
+
+    .direction-btn:active {
+      background: rgba(0, 212, 255, 0.5);
+      transform: scale(0.98);
+    }
+
+    .direction-btn.up { grid-column: 2; }
+    .direction-btn.left { grid-column: 1; }
+    .direction-btn.stop { grid-column: 2; }
+    .direction-btn.right { grid-column: 3; }
+    .direction-btn.down { grid-column: 2; }
+
+    .stop-btn {
+      background: rgba(255, 50, 50, 0.2) !important;
+      border-color: rgba(255, 50, 50, 0.5) !important;
+      color: #ff3333 !important;
+    }
+
+    .stop-btn:hover {
+      background: rgba(255, 50, 50, 0.4) !important;
+    }
+
+    .stop-btn:active {
+      background: rgba(255, 50, 50, 0.6) !important;
+    }
+
+    /* Stats & Info */
+    .info-panel {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+    }
+
+    .info-card {
+      background: rgba(0, 212, 255, 0.1);
+      border: 2px solid rgba(0, 212, 255, 0.3);
+      border-radius: 10px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .info-label {
+      font-size: 0.8rem;
+      color: #00d4ff;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 0.5rem;
+    }
+
+    .info-value {
+      font-size: 1.5rem;
+      color: #00ff88;
+      font-weight: 700;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 2rem;
+      color: #666;
+      font-size: 0.8rem;
+    }
+
+    @media (max-width: 600px) {
+      h1 { font-size: 1.8rem; }
+      .direction-grid { max-width: 250px; }
+      .config-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  
+  <header>
+    <h1>🤖 ROBO CAR</h1>
+    <p style="color: #999; margin-top: 0.5rem;">Web-based Vehicle Control</p>
+  </header>
+
+  <div class="status">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">DISCONNECTED</span>
+  </div>
+
+  <!-- Configuration -->
+  <div class="config-section">
+    <h2>⚙️ Configuration</h2>
+    <div class="config-grid">
+      <div class="input-group">
+        <label>WRITE API KEY</label>
+        <input type="text" id="writeApiKey" placeholder="Your ThingSpeak Write API Key">
+      </div>
+      <div class="input-group">
+        <label>CHANNEL ID</label>
+        <input type="text" id="channelId" placeholder="e.g., 3301674">
+      </div>
+    </div>
+    <div class="btn-group">
+      <button onclick="connectCar()">▶ CONNECT CAR</button>
+      <button onclick="testConnection()" style="background: rgba(0, 212, 255, 0.2); color: #00d4ff;">⚡ TEST</button>
+    </div>
+  </div>
+
+  <!-- Control Pad -->
+  <div class="control-pad">
+    <h2>🎮 Movement Control</h2>
+    <div class="direction-grid">
+      <button class="direction-btn up" onclick="sendCommand('FORWARD')" title="Move Forward">▲<br>FWD</button>
+      <button class="direction-btn left" onclick="sendCommand('LEFT')" title="Turn Left">◀<br>LEFT</button>
+      <button class="direction-btn stop" onclick="sendCommand('STOP')" title="Stop">■<br>STOP</button>
+      <button class="direction-btn right" onclick="sendCommand('RIGHT')" title="Turn Right">▶<br>RIGHT</button>
+      <button class="direction-btn down" onclick="sendCommand('BACKWARD')" title="Move Backward">▼<br>BACK</button>
+    </div>
+  </div>
+
+  <!-- Info Panel -->
+  <div class="info-panel">
+    <div class="info-card">
+      <div class="info-label">Last Command</div>
+      <div class="info-value" id="lastCommand">--</div>
+    </div>
+    <div class="info-card">
+      <div class="info-label">Sent Count</div>
+      <div class="info-value" id="sentCount">0</div>
+    </div>
+    <div class="info-card">
+      <div class="info-label">Status</div>
+      <div class="info-value" id="lastStatus" style="color: #ff9800;">--</div>
+    </div>
+    <div class="info-card">
+      <div class="info-label">Response Time</div>
+      <div class="info-value" id="responseTime">-- ms</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    ROBO CAR CONTROLLER v1.0 | ThingSpeak Integration | Real-time Vehicle Control
+  </div>
+
+</div>
+
+<script>
+  let WRITE_API_KEY = '';
+  let CHANNEL_ID = '';
+  let sentCount = 0;
+  let isConnected = false;
+
+  // Connect to car via ThingSpeak
+  function connectCar() {
+    WRITE_API_KEY = document.getElementById('writeApiKey').value.trim();
+    CHANNEL_ID = document.getElementById('channelId').value.trim();
+
+    if (!WRITE_API_KEY || !CHANNEL_ID) {
+      alert('Please enter both Write API Key and Channel ID');
+      return;
+    }
+
+    updateStatus('CONNECTED', true);
+    isConnected = true;
+  }
+
+  // Send command to car
+  async function sendCommand(command) {
+    if (!WRITE_API_KEY || !CHANNEL_ID) {
+      alert('Please connect first!');
+      return;
+    }
+
+    const startTime = Date.now();
+    const url = `https://api.thingspeak.com/update?api_key=${WRITE_API_KEY}&field1=${command}`;
+
+    try {
+      const res = await fetch(url);
+      const responseTime = Date.now() - startTime;
+
+      if (res.ok) {
+        sentCount++;
+        document.getElementById('lastCommand').textContent = command;
+        document.getElementById('sentCount').textContent = sentCount;
+        document.getElementById('lastStatus').textContent = '✓ OK';
+        document.getElementById('lastStatus').style.color = '#00ff88';
+        document.getElementById('responseTime').textContent = responseTime + ' ms';
+      } else {
+        document.getElementById('lastStatus').textContent = '✗ FAIL';
+        document.getElementById('lastStatus').style.color = '#ff3333';
+      }
+    } catch (e) {
+      document.getElementById('lastStatus').textContent = 'ERROR';
+      document.getElementById('lastStatus').style.color = '#ff3333';
+    }
+  }
+
+  // Test connection
+  async function testConnection() {
+    if (!WRITE_API_KEY || !CHANNEL_ID) {
+      alert('Please enter credentials first');
+      return;
+    }
+
+    const url = `https://api.thingspeak.com/update?api_key=${WRITE_API_KEY}&field1=TEST`;
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        alert('✓ Connection successful!');
+        connectCar();
+      } else {
+        alert('✗ Connection failed: ' + res.status);
+      }
+    } catch (e) {
+      alert('✗ Error: ' + e.message);
+    }
+  }
+
+  // Update status indicator
+  function updateStatus(text, connected) {
+    document.getElementById('statusText').textContent = text;
+    const dot = document.getElementById('statusDot');
+    if (connected) {
+      dot.classList.add('connected');
+    } else {
+      dot.classList.remove('connected');
+    }
+  }
+
+  // Keyboard controls (optional)
+  document.addEventListener('keydown', (e) => {
+    if (!isConnected) return;
+    
+    switch(e.key.toUpperCase()) {
+      case 'ARROWUP':
+      case 'W':
+        sendCommand('FORWARD');
+        break;
+      case 'ARROWDOWN':
+      case 'S':
+        sendCommand('BACKWARD');
+        break;
+      case 'ARROWLEFT':
+      case 'A':
+        sendCommand('LEFT');
+        break;
+      case 'ARROWRIGHT':
+      case 'D':
+        sendCommand('RIGHT');
+        break;
+      case ' ':
+        sendCommand('STOP');
+        e.preventDefault();
+        break;
+    }
+  });
+</script>
+
+</body>
+</html>
